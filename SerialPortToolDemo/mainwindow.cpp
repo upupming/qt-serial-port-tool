@@ -38,7 +38,7 @@ void MainWindow::on_OpenSerialButton_clicked()
         serial = new QSerialPort;
         //设置串口名
         serial->setPortName(ui->PortBox->currentText());
-        //打卡串口
+        //打开串口
         serial->open(QIODevice::ReadWrite);
         //设置波特率
         serial->setBaudRate(ui->BaudBox->currentText().toInt());
