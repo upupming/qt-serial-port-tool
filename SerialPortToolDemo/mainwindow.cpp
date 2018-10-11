@@ -4,6 +4,10 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 
+#include <iostream>
+#include <sstream>
+using namespace std;
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -114,7 +118,11 @@ void MainWindow::ReadData()
     if(!buf.isEmpty())
     {
         QString str = ui->textEdit->toPlainText();
-        str+=tr(buf);
+        for (int i = 0; i < buf.size(); ++i) {
+            stringstream ss;
+            ss << hex << (int)(buf.at(i));
+            str += QString::fromStdString(ss.str());
+        }
         ui->textEdit->clear();
         ui->textEdit->append(str);
 
