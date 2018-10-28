@@ -17,7 +17,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     //查找可用的串口
-    foreach (const QSerialPortInfo &info,QSerialPortInfo::availablePorts())
+    QList<QSerialPortInfo> ports = QSerialPortInfo::availablePorts();
+    reverse(ports.begin(), ports.end());
+    foreach (const QSerialPortInfo &info, ports)
     {
         QSerialPort serial;
         serial.setPort(info);
@@ -125,13 +127,13 @@ void MainWindow::calData() {
         differenceDisplacement = difference[2] + difference[1]/100.0 + difference[2]/10000.0;
     }
 
+    previousDisplacement = previous[2] + previous[1]/100.0 + previous[0]/10000.0;
     previous[0] = current[0];
     previous[1] = current[1];
     previous[2] = current[2];
-    previousDisplacement = previous[2] + previous[1]/100.0 + previous[0]/10000.0;
 
     dataUpdated = true;
-    displayString = currentDisplacement + '\t' + previousDisplacement + '\t' + differenceDisplacement;
+    displayString = to_string(currentDisplacement) + '\t' + to_string(previousDisplacement) + '\t' + to_string(differenceDisplacement);
 }
 
 string MainWindow::bufToString(QByteArray buf) {
@@ -154,24 +156,27 @@ void MainWindow::ReadData()
     if(!buf.isEmpty())
     {
         if(!dataStarted) {
-            if(bufToString(buf) == 'aa') {
+            // 假定数据起始 aa 到达时 buf.size() == 1
+            if(bufToString(buf) == "aa") {
+                cout << "Starting to accumulate buf..." << endl;
                 dataStarted = true;
                 sizeRead = 0;
             }
         } else {
+            // 假定同一个 buf 里面不同时含有（两次测量的数据中的一部分）
             size4Buf += buf;
             sizeRead += buf.size();
-            
+
             if(sizeRead == 4) {
-                bufToString(size4Buf);
+                cout << "4 bytes [" << bufToString(size4Buf) << "] have been accumulated, starting to calculate data..." << endl;
                 calData();
                 if(dataUpdated) {
-                    cout << "data updated: " << current << endl;
+                    cout << "data updated: [" << current[0] << ", " << current[1] << ", " << current[2] << "]"<< endl;
 
                     QString str = ui->textEdit->toPlainText();
 
                     if(!headerPrinted) {
-                        str = QString::fromStdString(string("Current displacement") + "\t" + "Previous displacement" + "\t" + "Difference displacement" + "\n") + str;
+                        str = QString::fromStdString(string("Current") + "\t" + "Previous" + "\t" + "Difference" + "\n") + str;
                         headerPrinted = true;
                     }
 
@@ -179,12 +184,13 @@ void MainWindow::ReadData()
                     ui->textEdit->clear();
                     ui->textEdit->append(str);
                 }
-                
+
                 dataStarted = false;
+                size4Buf = QByteArray();
             }
         }
-        
-         cout << "There are " << buf.size() << " data in this buf, they are: " << bufStr << endl;;
+
+        cout << "There are " << buf.size() << " data in this buf, they are: " << bufToString(buf) << endl;;
 
     }
     buf.clear();

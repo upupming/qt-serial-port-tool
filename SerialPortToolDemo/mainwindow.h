@@ -45,6 +45,7 @@ private:
     bool headerPrinted = false;
     bool dataStarted = false;
     int sizeRead = 0;
+    // 存储 4 个 16 进制数
     QByteArray size4Buf = QByteArray();
 };
 
