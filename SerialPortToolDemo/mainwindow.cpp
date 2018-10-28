@@ -6,6 +6,8 @@
 
 #include <iostream>
 #include <sstream>
+#include <iomanip>
+#include <string>
 using namespace std;
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -85,7 +87,6 @@ void MainWindow::on_OpenSerialButton_clicked()
         ui->ParityBox->setEnabled(false);
         ui->StopBox->setEnabled(false);
         ui->OpenSerialButton->setText(tr("关闭串口"));
-
         //连接信号槽
         QObject::connect(serial,&QSerialPort::readyRead,this,&MainWindow::ReadData);
     }
@@ -106,10 +107,45 @@ void MainWindow::on_OpenSerialButton_clicked()
 
     }
 
-
-
-
 }
+
+void MainWindow::calData() {
+    dataUpdated = false;
+
+    current[0] = stoi(bufStr.substr(0, 2));
+    current[1] = stoi(bufStr.substr(2, 2));
+    current[2] = stoi(bufStr.substr(4, 2));
+    currentDisplacement = current[2] + current[1]/100.0 + current[0]/10000.0;
+
+    // Cal difference
+    if(previous[0] != 0 || previous[1] != 0 || previous[2] != 0) {
+        difference[0] = current[0] - previous[0];
+        difference[1] = current[1] - previous[1];
+        difference[2] = current[2] - previous[2];
+        differenceDisplacement = difference[2] + difference[1]/100.0 + difference[2]/10000.0;
+    }
+
+    previous[0] = current[0];
+    previous[1] = current[1];
+    previous[2] = current[2];
+    previousDisplacement = previous[2] + previous[1]/100.0 + previous[0]/10000.0;
+
+    dataUpdated = true;
+    displayString = currentDisplacement + '\t' + previousDisplacement + '\t' + differenceDisplacement;
+}
+
+string MainWindow::bufToString(QByteArray buf) {
+    bufStr = "";
+
+    for (int i = 0; i < buf.size(); ++i) {
+        stringstream ss;
+        ss << setfill('0') << setw(2) << setbase(16) << (int)(buf.at(i));
+        bufStr += ss.str();
+    }
+
+    return bufStr;
+}
+
 //读取接收到的信息
 void MainWindow::ReadData()
 {
@@ -117,14 +153,38 @@ void MainWindow::ReadData()
     buf = serial->readAll();
     if(!buf.isEmpty())
     {
-        QString str = ui->textEdit->toPlainText();
-        for (int i = 0; i < buf.size(); ++i) {
-            stringstream ss;
-            ss << hex << (int)(buf.at(i));
-            str += QString::fromStdString(ss.str());
+        if(!dataStarted) {
+            if(bufToString(buf) == 'aa') {
+                dataStarted = true;
+                sizeRead = 0;
+            }
+        } else {
+            size4Buf += buf;
+            sizeRead += buf.size();
+            
+            if(sizeRead == 4) {
+                bufToString(size4Buf);
+                calData();
+                if(dataUpdated) {
+                    cout << "data updated: " << current << endl;
+
+                    QString str = ui->textEdit->toPlainText();
+
+                    if(!headerPrinted) {
+                        str = QString::fromStdString(string("Current displacement") + "\t" + "Previous displacement" + "\t" + "Difference displacement" + "\n") + str;
+                        headerPrinted = true;
+                    }
+
+                    str += QString::fromStdString(displayString + '\n');
+                    ui->textEdit->clear();
+                    ui->textEdit->append(str);
+                }
+                
+                dataStarted = false;
+            }
         }
-        ui->textEdit->clear();
-        ui->textEdit->append(str);
+        
+         cout << "There are " << buf.size() << " data in this buf, they are: " << bufStr << endl;;
 
     }
     buf.clear();
